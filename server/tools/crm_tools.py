@@ -60,7 +60,7 @@ def register_crm_tools(mcp):
             Customer information or error message
         """
         try:
-            if customer_collection:
+            if customer_collection is not None:
                 # Use MongoDB
                 customer = customer_collection.find_one({"id": customer_id}, {"_id": 0})
                 if customer:
@@ -142,7 +142,7 @@ def register_crm_tools(mcp):
             if not updates:
                 return {"error": "No update fields provided", "status": "error"}
                 
-            if customer_collection:
+            if customer_collection is not None:
                 # Use MongoDB
                 result = customer_collection.update_one(
                     {"id": customer_id}, 
@@ -153,7 +153,7 @@ def register_crm_tools(mcp):
                     return {"error": "Customer not found", "status": "error"}
                     
                 # Return updated customer
-                return get_customer(customer_id)
+                return updates
             else:
                 # Use in-memory storage
                 if customer_id not in customers_memory:

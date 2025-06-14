@@ -6,6 +6,16 @@ An interactive AI assistant powered by PydanticAI and the Model Context Protocol
 ## Screenshots
 
 <details>
+<summary>Click to view CRM - Add Customer</summary>
+<img src="./public/tool_add_customer.png" alt="CRM tool adding customer">
+</details>
+
+<details>
+<summary>Click to view CRM - List Customers</summary>
+<img src="./public/tool_list_customer.png" alt="CRM tool listing customers">
+</details>
+
+<details>
 <summary>Click to view Agent Tool Usage</summary>
 <img src="./public/tool_show.png" alt="Agent using tool, showing which tools were used and arguments, plus MCP response">
 <em>*Agent using tool, it also shows which tools did it use and arguments. Then you can see the response from MCP</em>
@@ -14,16 +24,6 @@ An interactive AI assistant powered by PydanticAI and the Model Context Protocol
 <details>
 <summary>Click to view Weather Tool</summary>
 <img src="./public/tool_weather.png" alt="Weather tool demonstration">
-</details>
-
-<details>
-<summary>Click to view CRM - Add Customer</summary>
-<img src="./public/tool_add_customer.png" alt="CRM tool adding customer">
-</details>
-
-<details>
-<summary>Click to view CRM - List Customers</summary>
-<img src="./public/tool_list_customer.png" alt="CRM tool listing customers">
 </details>
 
 <details>
