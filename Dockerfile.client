@@ -1,0 +1,24 @@
+FROM python:3.10-slim
+
+WORKDIR /app
+
+# Install dependencies
+COPY requirements.txt .
+RUN pip install --no-cache-dir -r requirements.txt
+
+# Copy client code
+COPY app.py .
+COPY handlers.py .
+COPY config.py .
+COPY mcp_client.py .
+COPY chainlit.md .
+COPY .env.example .env
+
+# Set environment variables
+ENV PYTHONUNBUFFERED=1
+
+# Expose the port
+EXPOSE 8000
+
+# Run the client
+CMD ["chainlit", "run", "app.py", "--port", "8000", "--host", "0.0.0.0"]
