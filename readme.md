@@ -61,8 +61,9 @@ An interactive AI assistant powered by PydanticAI and the Model Context Protocol
 - "Create a plan for learning Python"
 - "Search for information about AI"
 
-4. **Manual Architecture (no longer using, use Pydantic instead)**
-```
+## Manual Architecture (no longer using, use Pydantic instead)
+
+```plaintext
 ┌────────────────┐     ┌─────────────────┐     ┌──────────────┐
 │                │     │                 │     │              │
 │  Chainlit UI   │◄───►│  Handlers.py    │◄───►│  LLM API     │
