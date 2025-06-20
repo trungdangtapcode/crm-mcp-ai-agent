@@ -6,3 +6,9 @@ If you are in dev mode, I suggest you use watch dog voiding suffer from restart 
 ```bash
 python devmode_watchdog.py
 ```
+
+Test your MCP
+
+```bash
+npx @modelcontextprotocol/inspector 
+```
