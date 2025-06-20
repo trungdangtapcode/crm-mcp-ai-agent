@@ -79,7 +79,7 @@ class MCPClient:
             
         # Default category
         return "general"
-          
+        
     async def initialize(self, retry_count=3, use_fallback=True):
         """
         Initialize the client by fetching available tools from the server
@@ -110,13 +110,12 @@ class MCPClient:
                         for tool in tools_data
                     ]
                     logger.info(f"Loaded {len(self.available_tools)} tools from MCP server")
-                    self.connection_status = "connected"
                     return self.available_tools
             except httpx.ConnectError as e:
                 logger.error(f"Connection failed (attempt {attempt+1}/{retry_count}): {str(e)}")
                 # Wait a bit before retrying
                 if attempt < retry_count - 1:
-                    await asyncio.sleep(1)
+                    await asyncio.sleep(1)            
             except Exception as e:
                 logger.error(f"Failed to initialize MCP client: {str(e)}")
                 break
