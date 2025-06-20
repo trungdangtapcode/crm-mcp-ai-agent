@@ -180,7 +180,7 @@ def register_crm_tools(mcp):
             List of customers
         """
         try:
-            if customer_collection:
+            if customer_collection is not None:
                 # Use MongoDB
                 customers = list(customer_collection.find({}, {"_id": 0}).limit(limit))
                 return {
