@@ -4,8 +4,8 @@ from datetime import datetime
 import chainlit as cl
 from typing import Dict, List, Any
 from openai import AsyncOpenAI
-from config import API_KEY, MCP_SERVER_URL, BASE_URL
-from mcp_client import MCPClient
+from config import API_KEY, MCP_SERVER_URL, BASE_URL, MODEL_NAME
+from manual_mcp_client import MCPClient
 
 # Configure logging
 logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(name)s - %(levelname)s - %(message)s")
@@ -65,7 +65,7 @@ async def handle_message(message: cl.Message):
     try:
         # Call the LLM
         response = await client.chat.completions.create(
-            model="mistralai/devstral-small:free",
+            model=MODEL_NAME,
             messages=messages,
             tools=tools,
             tool_choice="auto"
@@ -141,7 +141,7 @@ async def handle_message(message: cl.Message):
             
             # Call the model again to process tool results
             second_response = await client.chat.completions.create(
-                model="mistralai/devstral-small:free",
+                model=MODEL_NAME,
                 messages=conversation_history[conversation_id]
             )
             

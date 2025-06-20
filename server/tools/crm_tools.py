@@ -7,6 +7,7 @@ from typing import Dict, List, Any, Optional
 from pymongo import MongoClient
 from dotenv import load_dotenv
 import logging
+from config import MONGO_URI, MONGO_DB, MONGO_COLLECTION
 
 # Configure logging
 logger = logging.getLogger("crm_tools")
@@ -15,25 +16,18 @@ logger = logging.getLogger("crm_tools")
 def init_mongodb():
     """Initialize MongoDB connection"""
     try:
-        # Load environment variables
-        load_dotenv()
-        
-        # Get MongoDB connection details
-        mongo_uri = os.getenv('MONGO_URI')
-        mongo_db = os.getenv('MONGO_DB')
-        mongo_collection = os.getenv('MONGO_COLLECTION')
 
         # print(f"Connecting to MongoDB at {mongo_uri}, database: {mongo_db}, collection: {mongo_collection}")
         
         # Create connection
-        client = MongoClient(mongo_uri)
-        db = client[mongo_db]
-        collection = db[mongo_collection]
+        client = MongoClient(MONGO_URI)
+        db = client[MONGO_DB]
+        collection = db[MONGO_COLLECTION]
         
         # Create unique index on "id" field
         collection.create_index("id", unique=True)
         
-        logger.info(f"MongoDB initialized: {mongo_db}.{mongo_collection}")
+        logger.info(f"MongoDB initialized: {MONGO_DB}.{MONGO_COLLECTION}")
         
         return collection
     except Exception as e:

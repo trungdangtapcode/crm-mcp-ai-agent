@@ -8,6 +8,8 @@ from datetime import datetime
 from config import API_KEY, MCP_SERVER_URL, BASE_URL, MODEL_NAME
 from pydantic_ai.models.openai import OpenAIModel
 from pydantic_ai.providers.openai import OpenAIProvider
+from pydantic_ai.models.gemini import GeminiModel
+from pydantic_ai.providers.google_gla import GoogleGLAProvider
 
 # Configure logging
 logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(name)s - %(levelname)s - %(message)s")
@@ -17,9 +19,13 @@ logger = logging.getLogger("pydantic_agent")
 conversation_history = {}
 
 def get_model():
-    """Get the OpenAI model configured with custom base URL and API key"""
-    ollama = OpenAIModel(model_name=MODEL_NAME, provider=OpenAIProvider(base_url=BASE_URL, api_key=API_KEY))
-    return ollama
+    """Get the models based on the configuration"""
+    if MODEL_NAME.startswith("gemini"):
+        print("Using Gemini model", MODEL_NAME, " API = ", API_KEY)
+        model = GeminiModel(model_name=MODEL_NAME, provider=GoogleGLAProvider(api_key=API_KEY))
+    else:    
+        model = OpenAIModel(model_name=MODEL_NAME, provider=OpenAIProvider(base_url=BASE_URL, api_key=API_KEY))
+    return model
 
 # Set up MCP Server
 server = MCPServerSSE(url=MCP_SERVER_URL)
