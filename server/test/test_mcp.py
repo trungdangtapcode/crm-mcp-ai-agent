@@ -18,7 +18,7 @@ from mcp_client import MCPClient
 logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(name)s - %(levelname)s - %(message)s")
 logger = logging.getLogger("test_mcp")
 
-MCP_SERVER_URL = "http://localhost:8000"
+MCP_SERVER_URL = "http://localhost:8001"
 
 async def test_all_tools():
     """Test all available tools on the MCP server"""

@@ -50,9 +50,13 @@ def create_mcp_server():
     return mcp
 
 # Create server instance
-mcp_server = create_mcp_server()
+mcp = create_mcp_server()
 
 # Run the server
+# RUN THIS COMMAND: fastmcp run main.py:mcp --transport sse --port 8001 --host 0.0.0.0
 if __name__ == "__main__":
     logger.info("Starting MCP server with agentic capabilities")
-    mcp_server.run()
+    # Specify port 8001 to match the client configuration
+    # Set host to 0.0.0.0 to accept connections from any IP
+    # uvicorn main:app --host 0.0.0.0 --port 8001, suck
+    mcp.run()

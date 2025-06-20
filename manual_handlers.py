@@ -17,6 +17,7 @@ conversation_history = {}
 @cl.on_chat_start
 async def setup_mcp():
     # Initialize MCP client
+    print("Setting up MCP client...", MCP_SERVER_URL)
     mcp_client = MCPClient(MCP_SERVER_URL)
     await mcp_client.initialize()
     
@@ -82,15 +83,50 @@ async def handle_message(message: cl.Message):
         # Handle tool calls if any
         if assistant_message.tool_calls:
             await thinking_msg.stream_token("Executing tools... 🛠️\n\n")
+
+            # # Get available tools for validation
+            print("Available tools:", tools)
+            available_tools = {tool['function']['name']: tool for tool in tools}
+
+            # Convert tool_calls to dictionaries before passing to execute_tool_calls
+            tool_calls_dicts = []
+            for tool_call in assistant_message.tool_calls:
+                print(f"Processing tool call: {tool_call.id} for tool {tool_call.function.name}")
+                tool_name = tool_call.function.name
+                if tool_name not in available_tools:
+                    await thinking_msg.stream_token(f"Error: Tool '{tool_name}' not found.\n")
+                    continue
+
+                # Ensure arguments is a valid JSON string, empty dict as fallback
+                arguments = tool_call.function.arguments or "{}"
+                
+                tool_calls_dicts.append({
+                    "id": tool_call.id,
+                    "function": {
+                        "name": tool_call.function.name,
+                        "arguments": arguments
+                    }
+                })
             
+            print("Tool calls to execute:", tool_calls_dicts)
+
             # Execute all tool calls
-            tool_results = await mcp_client.execute_tool_calls(assistant_message.tool_calls)
-            
+            tool_results = await mcp_client.execute_tool_calls(tool_calls_dicts)
             # Create a message showing executed tools
             tools_msg = "**Tools executed:**\n\n"
             for result in tool_results:
+                if result is None:
+                    continue
+                    
                 tool_name = result.get("name", "unknown")
-                tool_content = json.dumps(result.get("result"), indent=2)
+                tool_result = result.get("result")
+                
+                # Handle possible None result
+                if tool_result is None:
+                    tool_content = "null"
+                else:
+                    tool_content = json.dumps(tool_result, indent=2)
+                
                 tools_msg += f"📌 **{tool_name}**\n```json\n{tool_content}\n```\n\n"
                 
                 # Add tool results to conversation history
@@ -98,7 +134,7 @@ async def handle_message(message: cl.Message):
                     "role": "tool", 
                     "tool_call_id": result.get("tool_call_id"),
                     "name": tool_name,
-                    "content": json.dumps(result.get("result"))
+                    "content": tool_content
                 })
             
             await thinking_msg.stream_token(tools_msg)

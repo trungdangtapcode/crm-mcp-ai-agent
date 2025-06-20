@@ -7,7 +7,13 @@ enabling agentic capabilities for AI applications.
 import asyncio
 import logging
 from typing import Dict, Any, List, Optional, Union
-import httpx
+try:
+    from fastmcp import Client
+    from fastmcp.client.transports import SSETransport
+    FASTMCP_AVAILABLE = True
+except ImportError:
+    FASTMCP_AVAILABLE = False
+    import httpx
 from pydantic import BaseModel, Field
 
 # Configure logging
@@ -23,7 +29,7 @@ class Tool(BaseModel):
     category: str = "general"  # Added tool category
 
 class MCPClient:
-    """Client for interacting with an MCP server"""
+    """Client for interacting with an MCP server using SSE transport"""
     
     def __init__(self, base_url: str, timeout: int = 30):
         """
@@ -36,6 +42,23 @@ class MCPClient:
         self.base_url = base_url
         self.timeout = timeout
         self.available_tools: List[Tool] = []
+        self.connection_status = "disconnected"
+        
+        # Initialize FastMCP client with SSE transport if available
+        if FASTMCP_AVAILABLE:
+            # Create SSE transport for FastMCP server
+            # FastMCP SSE servers typically use /sse/ in the path or can be explicitly configured
+            sse_url = base_url
+            if not "/sse" in sse_url:
+                # Add /sse to the URL if not present for SSE transport
+                sse_url = base_url.rstrip('/') + '/sse'
+            
+            self.transport = SSETransport(url=sse_url)
+            self.fastmcp_client = Client(self.transport)
+            logger.info(f"Initialized FastMCP client with SSE transport for {sse_url}")
+        else:
+            logger.warning("FastMCP not available, falling back to basic HTTP client")
+            self.fastmcp_client = None
         
     def _infer_tool_category(self, tool_name: str) -> str:
         """
@@ -79,7 +102,7 @@ class MCPClient:
             
         # Default category
         return "general"
-          
+        
     async def initialize(self, retry_count=3, use_fallback=True):
         """
         Initialize the client by fetching available tools from the server
@@ -91,13 +114,97 @@ class MCPClient:
         Returns:
             List of available tools
         """
+        if FASTMCP_AVAILABLE and self.fastmcp_client:
+            # Use FastMCP client with SSE transport
+            for attempt in range(retry_count):
+                try:
+                    logger.info(f"Connecting to MCP server via SSE at {self.base_url} (attempt {attempt+1}/{retry_count})")
+                    
+                    # Connect to the FastMCP server
+                    async with self.fastmcp_client as client:
+                        # List available tools
+                        tools_response = await client.list_tools()
+                        
+                        # Convert FastMCP tools to our Tool format
+                        self.available_tools = []
+                        if hasattr(tools_response, 'tools') and tools_response.tools:
+                            for tool in tools_response.tools:
+                                # Extract tool information from FastMCP tool object
+                                tool_name = tool.name if hasattr(tool, 'name') else str(tool.get('name', ''))
+                                tool_desc = tool.description if hasattr(tool, 'description') else str(tool.get('description', ''))
+                                
+                                # Handle input schema
+                                parameters = {}
+                                required_params = []
+                                if hasattr(tool, 'inputSchema') and tool.inputSchema:
+                                    schema = tool.inputSchema
+                                    if hasattr(schema, 'properties'):
+                                        parameters = schema.properties or {}
+                                    elif isinstance(schema, dict):
+                                        parameters = schema.get('properties', {})
+                                    
+                                    if hasattr(schema, 'required'):
+                                        required_params = schema.required or []
+                                    elif isinstance(schema, dict):
+                                        required_params = schema.get('required', [])
+                                
+                                self.available_tools.append(Tool(
+                                    name=tool_name,
+                                    description=tool_desc,
+                                    parameters=parameters,
+                                    category=self._infer_tool_category(tool_name),
+                                    required_parameters=required_params
+                                ))
+                        
+                        logger.info(f"Loaded {len(self.available_tools)} tools from FastMCP server via SSE")
+                        self.connection_status = "connected"
+                        return self.available_tools
+                        
+                except Exception as e:
+                    logger.error(f"FastMCP SSE connection failed (attempt {attempt+1}/{retry_count}): {str(e)}")
+                    if attempt < retry_count - 1:
+                        await asyncio.sleep(1)
+                    
+            # If all FastMCP attempts failed, fall back to HTTP
+            logger.warning("FastMCP SSE connection failed, trying HTTP fallback")
+        
+        # Fallback to HTTP for backwards compatibility
         for attempt in range(retry_count):
             try:
-                logger.info(f"Connecting to MCP server at {self.base_url} (attempt {attempt+1}/{retry_count})")
+                logger.info(f"Connecting to MCP server via HTTP at {self.base_url} (attempt {attempt+1}/{retry_count})")
+                if not FASTMCP_AVAILABLE:
+                    import httpx
+                    
                 async with httpx.AsyncClient(timeout=self.timeout) as client:
-                    response = await client.get(f"{self.base_url}/tools")
+                    # Try to list available tools from the common endpoint
+                    response = await client.get(f"{self.base_url}/")
                     response.raise_for_status()
-                    tools_data = response.json()
+                    
+                    # Try to parse the server response and extract tools
+                    try:
+                        data = response.json()
+                        # Check if we have a tools list directly
+                        if isinstance(data, list):
+                            tools_data = data
+                        # Check if tools are in a nested structure
+                        elif isinstance(data, dict) and "tools" in data:
+                            tools_data = data["tools"]
+                        else:
+                            # Manually create a basic list based on registered tool modules
+                            logger.warning("Could not find tools in server response, creating basic tool list")
+                            tools_data = [
+                                {"name": "get_current_time", "description": "Get current time"},
+                                {"name": "get_date_info", "description": "Get detailed date information"},
+                                {"name": "weather_info", "description": "Get weather information"},
+                                {"name": "search_web", "description": "Search the web"},
+                                {"name": "remember", "description": "Store information in memory"},
+                                {"name": "recall", "description": "Recall information from memory"},
+                                {"name": "calculate_expression", "description": "Calculate a mathematical expression"},
+                                {"name": "list_customers", "description": "List customers from CRM"}
+                            ]
+                    except Exception as e:
+                        logger.error(f"Error parsing tools: {str(e)}")
+                        tools_data = []
                     
                     self.available_tools = [
                         Tool(
@@ -109,17 +216,13 @@ class MCPClient:
                         )
                         for tool in tools_data
                     ]
-                    logger.info(f"Loaded {len(self.available_tools)} tools from MCP server")
+                    logger.info(f"Loaded {len(self.available_tools)} tools from MCP server via HTTP")
                     self.connection_status = "connected"
                     return self.available_tools
-            except httpx.ConnectError as e:
-                logger.error(f"Connection failed (attempt {attempt+1}/{retry_count}): {str(e)}")
-                # Wait a bit before retrying
+            except Exception as e:
+                logger.error(f"HTTP connection failed (attempt {attempt+1}/{retry_count}): {str(e)}")
                 if attempt < retry_count - 1:
                     await asyncio.sleep(1)
-            except Exception as e:
-                logger.error(f"Failed to initialize MCP client: {str(e)}")
-                break
         
         # If we got here, all attempts failed
         if use_fallback:
@@ -229,25 +332,42 @@ class MCPClient:
         Returns:
             The result of the tool execution
         """
+        print("In call_tool()")
+        print(f"Calling tool: {tool_name} with params: {params}")
+
+        # Try FastMCP client first if available
+        if FASTMCP_AVAILABLE and self.fastmcp_client:
+            try:
+                async with self.fastmcp_client as client:
+                    result = await client.call_tool(tool_name, **params)
+                    return result
+            except Exception as e:
+                logger.error(f"FastMCP SSE call failed for tool {tool_name}: {str(e)}")
+                # Fall through to HTTP fallback
+
         # Check if tool exists in fallback tools
         is_fallback_available = False
         for tool in self.available_tools:
             if tool.name == tool_name:
                 is_fallback_available = True
                 break
-        
-        # Try to call the tool on the server
+                
+        # Try HTTP fallback if FastMCP failed
         try:
+            if not FASTMCP_AVAILABLE:
+                import httpx
+                
             async with httpx.AsyncClient(timeout=self.timeout) as client:
+                # Use direct tool endpoint without 'tools/' prefix to match FastMCP's routing
                 response = await client.post(
-                    f"{self.base_url}/tools/{tool_name}", 
+                    f"{self.base_url}/{tool_name}", 
                     json=params
                 )
                 response.raise_for_status()
                 result = response.json()
                 return result.get("result")
-        except httpx.ConnectError as e:
-            logger.error(f"Connection error calling tool {tool_name}: {str(e)}")
+        except Exception as e:
+            logger.error(f"HTTP connection error calling tool {tool_name}: {str(e)}")
             
             # If we have a fallback tool implementation, use it
             if is_fallback_available and hasattr(self, f"_fallback_{tool_name}"):
@@ -256,9 +376,6 @@ class MCPClient:
                 return await fallback_method(**params)
             else:
                 raise ConnectionError(f"Could not connect to MCP server for tool {tool_name} and no fallback is available")
-        except Exception as e:
-            logger.error(f"Error calling tool {tool_name}: {str(e)}")
-            raise
 
     async def execute_tool_calls(self, tool_calls: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
         """
@@ -270,14 +387,15 @@ class MCPClient:
         Returns:
             List of tool results with their IDs
         """
+        print("In execute_tool_calls()")
         results = []
         for call in tool_calls:
             try:
+                print("Processing tool call:", call)
                 tool_id = call.get("id")
                 function = call.get("function", {})
                 name = function.get("name")
                 arguments = function.get("arguments", "{}")
-                
                 # Parse arguments - handle both JSON string and dict
                 if isinstance(arguments, str):
                     import json
@@ -285,6 +403,10 @@ class MCPClient:
                         arguments = json.loads(arguments)
                     except json.JSONDecodeError:
                         arguments = {}
+                
+                # Ensure arguments is a dictionary, not None
+                if arguments is None:
+                    arguments = {}
                 
                 result = await self.call_tool(name, **arguments)
                 results.append({

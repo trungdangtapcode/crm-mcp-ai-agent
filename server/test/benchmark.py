@@ -20,7 +20,7 @@ from mcp_client import MCPClient
 logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(name)s - %(levelname)s - %(message)s")
 logger = logging.getLogger("benchmark_mcp")
 
-MCP_SERVER_URL = "http://localhost:8000"
+MCP_SERVER_URL = "http://localhost"
 ITERATIONS = 10
 
 async def measure_tool_performance(client: MCPClient, tool_name: str, params: Dict[str, Any], iterations: int = 5) -> Dict[str, Any]:

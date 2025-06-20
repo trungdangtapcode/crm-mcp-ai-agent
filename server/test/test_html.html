@@ -1,0 +1,16 @@
+<!DOCTYPE html>
+<html>
+<body>
+  <h1>SSE Test</h1>
+  <div id="output"></div>
+  <script>
+    const source = new EventSource('http://localhost:8001/sse');
+    source.onmessage = function(event) {
+      document.getElementById('output').innerText += 'Received: ' + event.data + '\n';
+    };
+    source.onerror = function() {
+      document.getElementById('output').innerText += 'Error occurred\n';
+    };
+  </script>
+</body>
+</html>

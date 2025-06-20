@@ -22,6 +22,8 @@ def init_mongodb():
         mongo_uri = os.getenv('MONGO_URI')
         mongo_db = os.getenv('MONGO_DB')
         mongo_collection = os.getenv('MONGO_COLLECTION')
+
+        # print(f"Connecting to MongoDB at {mongo_uri}, database: {mongo_db}, collection: {mongo_collection}")
         
         # Create connection
         client = MongoClient(mongo_uri)
@@ -106,7 +108,7 @@ def register_crm_tools(mcp):
                 "phone": phone
             }
             
-            if customer_collection:
+            if customer_collection is not None:
                 # Use MongoDB
                 customer_collection.insert_one(customer)
             else:
