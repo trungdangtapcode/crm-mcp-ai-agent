@@ -1,3 +1,4 @@
+from functools import wraps
 from pydantic_ai import Agent
 from pydantic_ai.mcp import MCPServerSSE
 import asyncio
@@ -28,6 +29,12 @@ def get_model():
     return model
 
 # Set up MCP Server
+
+async def process_tool_call(ctx, call_tool, tool_name: str, args: dict):
+    # 1. Notify Chainlit UI that a tool is being called
+    await cl.Message(content=f"🔧 Calling tool: **{tool_name}**").send()
+    # 2. Execute the actual call
+    return await call_tool(tool_name, args)
 server = MCPServerSSE(url=MCP_SERVER_URL)
 
 # Create the Agent with the custom OpenAI client
@@ -71,19 +78,45 @@ async def handle_message(message: cl.Message):
         thinking_msg = cl.Message(content="")
         await thinking_msg.send()
         
+        # Prepare input for the agent with full conversation history
+        agent_input = {
+            "messages": conversation_history[conversation_id]
+        }
+
         # Use PydanticAI to process the message with MCP tools
         async with agent_instance.run_mcp_servers():
             # Build context from conversation history
             context = "\n".join([
                 f"{msg['role']}: {msg['content']}" 
-                for msg in conversation_history[conversation_id][-5:]  # Last 5 messages for context
+                for msg in conversation_history[conversation_id][-20:]  # Last 20 messages for context
             ])
             
             await thinking_msg.stream_token("Processing with PydanticAI agent... 🤖\n\n")
             
             # Run the agent with the user's message
-            result = await agent_instance.run(message.content)
             
+            print("context:", context)
+            events = []
+            async with agent_instance.iter(context) as iterator:
+                async for event in iterator:
+                    events.append(event)
+                    print(f"Event dict: {event.__dict__}")
+                    if hasattr(event, "model_response") and event.model_response.parts:
+                        tool_part = event.model_response.parts[0]  # First part is ToolCallPart
+                        if (tool_part.__class__.__name__ == "ToolCallPart"):
+                            tool_name = tool_part.tool_name
+                            tool_args = tool_part.args
+                            await thinking_msg.stream_token(f"**Tool Used**: {tool_name}\n")
+                            await thinking_msg.stream_token(f"**Tool Arguments**: {tool_args}\n")
+                    if hasattr(event, "request") and event.request.parts:
+                        request_part = event.request.parts[0]
+                        if (request_part.__class__.__name__ == "ToolReturnPart"):
+                            tool_return = request_part.content
+                            print(f"Tool return: {request_part.__dict__}")
+                            await thinking_msg.stream_token(f"**MCP Tool Response**: {tool_return}\n")
+
+            result = await agent_instance.run(context)
+
             # Add assistant response to history
             conversation_history[conversation_id].append({
                 "role": "assistant", 
@@ -95,11 +128,11 @@ async def handle_message(message: cl.Message):
             await thinking_msg.stream_token(result.output)
             await thinking_msg.update()
             
-            logger.info(f"Successfully processed message with PydanticAI: {message.content[:50]}...")
+            logger.info(f"Successfully processed message: {message.content[:50]}... (Conversation ID: {conversation_id})")
             
     except Exception as e:
         error_message = f"An error occurred with PydanticAI: {str(e)}"
-        logger.error(error_message)
+        logger.error(f"Error in handle_message (Conversation ID: {conversation_id}): {error_message}")
         await thinking_msg.stream_token(error_message)
         await thinking_msg.update()
 

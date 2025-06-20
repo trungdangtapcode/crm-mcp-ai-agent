@@ -147,7 +147,7 @@ def register_search_tools(mcp):
 
     
     @mcp.tool
-    def fetch_webpage(url: str) -> Dict[str, Any]:
+    def fetch_content_from_url(url: str) -> Dict[str, Any]:
         """
         Fetch content from a webpage and return it in a structured format. This format is easy for LLM processing.
         
