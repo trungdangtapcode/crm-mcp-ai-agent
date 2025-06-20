@@ -1,5 +1,8 @@
 .env
 /__pycache__
+**/**/__pycache__/
+**/__pycache__/
+server/tools/__pycache__
 /.files
 /.chainlit
 chainlit.md
